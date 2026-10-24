@@ -140,3 +140,22 @@ async def upload_documents(
             warnings=all_warnings,
         ),
     )
+
+
+@router.get("", response_model=ApiResponse[List[DocumentMetadata]])
+async def list_documents(
+    role: Optional[DocumentRole] = None,
+) -> ApiResponse[List[DocumentMetadata]]:
+    """List uploaded documents with optional role filter."""
+    settings = get_settings()
+    doc_repo = DocumentRepository(settings.sqlite_db_path)
+    docs = doc_repo.list_documents(role=role)
+    return ApiResponse[List[DocumentMetadata]](
+        success=True,
+        data=docs,
+        meta=ApiMeta(
+            request_id=get_request_id(),
+            processing_state=ProcessingState.COMPLETED,
+            version=settings.app_version,
+        ),
+    )

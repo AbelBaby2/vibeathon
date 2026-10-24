@@ -146,3 +146,12 @@ def test_complete_backend_workflow_from_upload_to_csv_export(client: TestClient)
     assert "CONTRACT_AWARD_SIMULATED" in event_types
     assert "PERMIT_ITEM_REVIEWED" in event_types
     assert "REPORT_EXPORTED" in event_types
+
+    # 9. Verify listing endpoints
+    list_analysis_resp = client.get("/api/v1/analysis")
+    assert list_analysis_resp.status_code == 200
+    assert len(list_analysis_resp.json()["data"]) >= 1
+
+    list_docs_resp = client.get("/api/v1/documents")
+    assert list_docs_resp.status_code == 200
+    assert len(list_docs_resp.json()["data"]) >= 3

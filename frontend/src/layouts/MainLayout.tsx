@@ -1,48 +1,59 @@
 import React from "react";
-import type { HealthStatus, ProcessingState } from "../types";
+import { AlertCircle } from "lucide-react";
+import { Header } from "../components/Header";
+import { Sidebar, type NavTab } from "../components/Sidebar";
+import type { ComplianceAnalysisResult, HealthStatus } from "../types";
 
 interface MainLayoutProps {
+  activeTab: NavTab;
+  onSelectTab: (tab: NavTab) => void;
+  currentAnalysis: ComplianceAnalysisResult | null;
+  analyses: ComplianceAnalysisResult[];
+  onSelectAnalysis: (analysisId: string) => void;
+  onNewAnalysisClick: () => void;
   health: HealthStatus | null;
-  processingState: ProcessingState;
   children: React.ReactNode;
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
+  activeTab,
+  onSelectTab,
+  currentAnalysis,
+  analyses,
+  onSelectAnalysis,
+  onNewAnalysisClick,
   health,
-  processingState,
   children
 }) => {
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="header-brand">
-          <span className="brand-badge">B2W</span>
-          <div>
-            <h1 className="brand-title">Bid2Work AI</h1>
-            <p className="brand-subtitle">
-              Tender Compliance &amp; Work-Permit Readiness Intelligence
-            </p>
-          </div>
-        </div>
-        <div className="header-status">
-          <span className="status-pill">State: {processingState}</span>
-          <span
-            className={`status-pill ${
-              health?.status === "healthy" ? "status-ok" : "status-warn"
-            }`}
-          >
-            API: {health ? `${health.status} (v${health.version})` : "connecting..."}
+      <Sidebar
+        activeTab={activeTab}
+        onSelectTab={onSelectTab}
+        health={health}
+      />
+
+      <div className="app-content">
+        <Header
+          activeTab={activeTab}
+          currentAnalysis={currentAnalysis}
+          analyses={analyses}
+          onSelectAnalysis={onSelectAnalysis}
+          onNewAnalysisClick={onNewAnalysisClick}
+          health={health}
+        />
+
+        <div className="disclaimer-strip" role="note">
+          <AlertCircle style={{ width: "14px", height: "14px", flexShrink: 0 }} />
+          <span>
+            <strong>Decision-Support Notice:</strong> Bid2Work AI assists human MSME bidders and compliance auditors. It does not execute automated legal eligibility determinations, formal tender contract adjudication, or legal work-permit issuance.
           </span>
         </div>
-      </header>
 
-      <div className="disclaimer-banner" role="note">
-        <strong>Decision-Support Notice:</strong> Bid2Work AI is a decision-support
-        intelligence tool, not an automated legal eligibility decision-maker or an
-        official permit-issuing system.
+        <main id="main-content" tabIndex={-1}>
+          {children}
+        </main>
       </div>
-
-      <main className="app-main">{children}</main>
     </div>
   );
 };

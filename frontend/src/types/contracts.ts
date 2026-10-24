@@ -203,6 +203,12 @@ export type PermitCategory =
   | "EMERGENCY_RESPONSE"
   | "HAZARD_CONTROL";
 
+export type HumanReviewStatus =
+  | "incomplete"
+  | "requires_verification"
+  | "ready_for_review"
+  | "approved_by_reviewer";
+
 export interface PermitChecklistItem {
   item_id: string;
   source_requirement_id?: string | null;
@@ -218,6 +224,35 @@ export interface PermitChecklistItem {
   is_expired: boolean;
   unresolved_conditions: string[];
   remediation_steps: string[];
+  review_status: HumanReviewStatus;
+  reviewer_name?: string | null;
+  reviewer_role?: string | null;
+  reviewer_notes?: string | null;
+  reviewed_at?: string | null;
+  attached_evidence_ids?: string[];
+}
+
+export interface PermitItemUpdateRequest {
+  review_status?: HumanReviewStatus;
+  reviewer_name?: string | null;
+  reviewer_role?: string | null;
+  reviewer_notes?: string | null;
+  is_authorized_reviewer?: boolean | null;
+  attached_evidence_ids?: string[] | null;
+}
+
+export interface AwardRequestPayload {
+  contract_reference?: string;
+  planned_start_date?: string | null;
+  site_location?: string;
+}
+
+export interface DocumentUploadBatchResponse {
+  uploaded_documents: DocumentMetadata[];
+  tender_document?: DocumentMetadata | null;
+  bidder_documents: DocumentMetadata[];
+  total_files: number;
+  warnings: string[];
 }
 
 export interface AwardSimulationRequest {

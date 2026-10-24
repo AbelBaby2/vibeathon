@@ -255,6 +255,25 @@ async def create_analysis(
     )
 
 
+@router.get("", response_model=ApiResponse[List[ComplianceAnalysisResult]])
+async def list_analyses(
+    limit: int = 20,
+) -> ApiResponse[List[ComplianceAnalysisResult]]:
+    """Retrieve recently stored compliance analyses."""
+    settings = get_settings()
+    analysis_repo = AnalysisRepository(settings.sqlite_db_path)
+    results = analysis_repo.list_analyses(limit=limit)
+    return ApiResponse[List[ComplianceAnalysisResult]](
+        success=True,
+        data=results,
+        meta=ApiMeta(
+            request_id=get_request_id(),
+            processing_state=ProcessingState.COMPLETED,
+            version=settings.app_version,
+        ),
+    )
+
+
 @router.get("/{analysis_id}", response_model=ApiResponse[ComplianceAnalysisResult])
 async def get_analysis(analysis_id: str) -> ApiResponse[ComplianceAnalysisResult]:
     """Retrieve compliance analysis results by analysis_id."""
@@ -330,8 +349,11 @@ async def simulate_contract_award_for_analysis(
     )
 
 
-@router.get("/{analysis_id}/permit-readiness", response_model=ApiResponse[PermitReadinessResult])
-async def get_permit_readiness(analysis_id: str) -> ApiResponse[PermitReadinessResult]:
+@router.get("/{analysis_id}/permit-readiness", response_model=ApiResponse[Optional[PermitReadinessResult]])
+async def get_permit_readiness(
+    analysis_id: str,
+    auto_simulate: bool = False,
+) -> ApiResponse[Optional[PermitReadinessResult]]:
     """Retrieve post-award work-permit checklist and readiness status."""
     settings = get_settings()
     analysis_repo = AnalysisRepository(settings.sqlite_db_path)
@@ -343,8 +365,8 @@ async def get_permit_readiness(analysis_id: str) -> ApiResponse[PermitReadinessR
         raise NotFoundError(f"Compliance analysis '{analysis_id}' was not found.")
 
     permit_res = permit_repo.get_checklist_by_analysis(analysis_id)
-    if not permit_res:
-        # Auto-simulate award with defaults if not already simulated
+    if not permit_res and auto_simulate:
+        # Auto-simulate award with defaults if requested
         permit_service = PermitReadinessService()
         audit_repo = AuditRepository(settings.sqlite_db_path)
         sim_request = AwardSimulationRequest(
@@ -363,7 +385,7 @@ async def get_permit_readiness(analysis_id: str) -> ApiResponse[PermitReadinessR
             details={"permit_pack_id": permit_res.permit_pack_id},
         )
 
-    return ApiResponse[PermitReadinessResult](
+    return ApiResponse[Optional[PermitReadinessResult]](
         success=True,
         data=permit_res,
         meta=ApiMeta(

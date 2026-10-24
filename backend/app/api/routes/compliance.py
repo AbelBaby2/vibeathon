@@ -10,7 +10,9 @@ from fastapi import APIRouter, File, Form, UploadFile
 from app.core.config import get_settings
 from app.core.exceptions import UploadLimitExceededError
 from app.core.logging import get_logger, get_request_id
+from app.models.analysis_record import AnalysisRepository
 from app.models.audit_record import AuditRepository
+from app.models.document_record import DocumentRepository
 from app.schemas.audit import AuditActorType, AuditEventType
 from app.schemas.common import ApiMeta, ApiResponse, ProcessingState
 from app.schemas.compliance import ComplianceAnalysisResult
@@ -97,6 +99,8 @@ async def analyze_tender_compliance(
     req_extractor = RequirementExtractorService()
     evidence_matcher = EvidenceMatcherService()
     rules_service = ComplianceRulesService()
+    doc_repo = DocumentRepository(settings.sqlite_db_path)
+    analysis_repo = AnalysisRepository(settings.sqlite_db_path)
     audit_repo = AuditRepository(settings.sqlite_db_path)
 
     warnings: List[str] = []
@@ -110,6 +114,7 @@ async def analyze_tender_compliance(
         role=DocumentRole.TENDER,
         content_type=tender_file.content_type or "application/pdf",
     )
+    doc_repo.save_document(tender_extraction)
     warnings.extend(tender_extraction.extraction_warnings)
 
     # 2. Extract bidder supporting PDFs
@@ -123,6 +128,7 @@ async def analyze_tender_compliance(
             role=DocumentRole.BIDDER_SUPPORTING,
             content_type=b_file.content_type or "application/pdf",
         )
+        doc_repo.save_document(b_extraction)
         warnings.extend(b_extraction.extraction_warnings)
         bidder_extractions.append(b_extraction)
 
@@ -168,6 +174,8 @@ async def analyze_tender_compliance(
         assessments=assessments,
         summary=summary,
     )
+
+    analysis_repo.save_analysis(result)
 
     audit_repo.record_event(
         event_type=AuditEventType.COMPLIANCE_EVALUATED,
