@@ -1,0 +1,53 @@
+services:
+  # Backend FastAPI Web Service
+  - type: web
+    name: bid2work-ai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_NAME
+        value: Bid2Work AI
+      - key: APP_ENV
+        value: production
+      - key: APP_VERSION
+        value: 0.1.0
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "25"
+      - key: MAX_BIDDER_FILES
+        value: "10"
+      - key: MAX_PAGES_PER_PDF
+        value: "200"
+      - key: TEMP_UPLOAD_DIR
+        value: /tmp/bid2work_uploads
+      - key: SQLITE_DB_PATH
+        value: /tmp/bid2work_audit.db
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: LLM_PROVIDER
+        value: openai_compatible
+      - key: LLM_BASE_URL
+        value: https://api.openai.com/v1
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      - key: LLM_API_KEY
+        sync: false
+
+  # Frontend React + Vite Static Site
+  - type: web
+    name: bid2work-ai-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
