@@ -13,6 +13,7 @@ from app.schemas.compliance import (
 )
 from app.schemas.permit import (
     AwardSimulationRequest,
+    HumanReviewStatus,
     PermitCategory,
     PermitChecklistItem,
     PermitItemStatus,
@@ -22,7 +23,7 @@ from app.schemas.permit import (
 
 
 class PermitReadinessService:
-    """Simulates contract award and carries safety/certification items into a permit checklist."""
+    """Simulates contract award and carries safety/operational items into a permit checklist."""
 
     def simulate_award_and_build_checklist(
         self, request: AwardSimulationRequest
@@ -37,7 +38,7 @@ class PermitReadinessService:
         top_unresolved: List[str] = []
         item_counter = 1
 
-        # Carry over SAFETY and CERTIFICATION requirements or those flagged requires_permit_carryover
+        # Carry forward SAFETY, CERTIFICATION, or requirements flagged requires_permit_carryover
         relevant_requirements = [
             r
             for r in request.tender_requirements
@@ -58,46 +59,62 @@ class PermitReadinessService:
             )
             is_expired = self._check_is_expired(expiry_date, reference_date_str)
 
-            permit_cat = (
-                PermitCategory.EQUIPMENT_CERTIFICATION
-                if req.category == RequirementCategory.CERTIFICATION
-                else PermitCategory.HSE_POLICY
-            )
+            # Determine permit category
+            desc_lower = req.description.lower()
+            if "worker" in desc_lower or "training" in desc_lower or "qualification" in desc_lower:
+                permit_cat = PermitCategory.WORKER_QUALIFICATION
+            elif "equipment" in desc_lower or "lifting" in desc_lower or req.category == RequirementCategory.CERTIFICATION:
+                permit_cat = PermitCategory.EQUIPMENT_CERTIFICATION
+            elif "hazard" in desc_lower or "confined space" in desc_lower:
+                permit_cat = PermitCategory.HAZARD_CONTROL
+            elif "site" in desc_lower or "approval" in desc_lower:
+                permit_cat = PermitCategory.SITE_APPROVAL
+            elif "insurance" in desc_lower or "liability" in desc_lower:
+                permit_cat = PermitCategory.INSURANCE_LIABILITY
+            else:
+                permit_cat = PermitCategory.HSE_POLICY
 
             unresolved: List[str] = []
             remediation: List[str] = []
 
             if is_expired:
                 status = PermitItemStatus.EXPIRED
+                review_state = HumanReviewStatus.REQUIRES_VERIFICATION
                 msg = (
                     f"Supporting qualification for '{req.title}' expired on {expiry_date} "
-                    f"(before reference date {reference_date_str})."
+                    f"(before mobilization date {reference_date_str})."
                 )
                 unresolved.append(msg)
                 top_unresolved.append(msg)
-                remediation.append("Submit renewed safety certificate or active endorsement.")
+                remediation.append("Submit renewed certificate or valid active endorsement prior to site mobilization.")
             elif not assessment or assessment.status == ComplianceStatus.MISSING:
                 status = PermitItemStatus.PENDING_EVIDENCE
+                review_state = HumanReviewStatus.INCOMPLETE
                 msg = f"Missing mandatory safety/permit evidence for '{req.title}'."
                 unresolved.append(msg)
                 top_unresolved.append(msg)
                 remediation.append(
-                    "Provide signed HSE documentation and obtain Site HSE Officer approval."
+                    "Provide signed safety documentation and obtain Site HSE Officer approval."
                 )
             elif assessment.status == ComplianceStatus.CONFLICTING:
                 status = PermitItemStatus.CONFLICTING
+                review_state = HumanReviewStatus.REQUIRES_VERIFICATION
                 msg = f"Conflicting safety documentation noted for '{req.title}'."
                 unresolved.append(msg)
                 top_unresolved.append(msg)
                 remediation.append("Resolve discrepancy in safety records before site entry.")
             elif assessment.status == ComplianceStatus.NEEDS_REVIEW:
                 status = PermitItemStatus.NEEDS_REVIEW
+                review_state = HumanReviewStatus.REQUIRES_VERIFICATION
                 msg = f"Manual HSE officer verification required for '{req.title}'."
                 unresolved.append(msg)
-                remediation.append("Conduct pre-mobilization safety review.")
+                remediation.append("Conduct pre-mobilization safety audit and verify original records.")
             else:
                 status = PermitItemStatus.VERIFIED
-                remediation.append("Maintain valid documentation on site during execution.")
+                review_state = HumanReviewStatus.READY_FOR_REVIEW
+                remediation.append("Maintain valid documentation and certified personnel on site during execution.")
+
+            evidence_ids = [ev.evidence_id for ev in evidence_list]
 
             checklist_items.append(
                 PermitChecklistItem(
@@ -119,6 +136,8 @@ class PermitReadinessService:
                     is_expired=is_expired,
                     unresolved_conditions=unresolved,
                     remediation_steps=remediation,
+                    review_status=review_state,
+                    attached_evidence_ids=evidence_ids,
                 )
             )
             item_counter += 1

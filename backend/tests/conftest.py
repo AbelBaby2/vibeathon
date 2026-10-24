@@ -19,6 +19,13 @@ from app.core.config import get_settings
 from app.main import create_app
 
 
+@pytest.fixture(autouse=True)
+def force_mock_llm_mode_for_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure automated tests run in deterministic mock mode without network calls by default."""
+    monkeypatch.setenv("LLM_ENABLED", "false")
+    get_settings.cache_clear()
+
+
 def build_text_pdf_bytes(page_texts: List[str]) -> bytes:
     """Create a valid in-memory PDF with extractable page-level text using pypdf."""
     writer = PdfWriter()
@@ -56,6 +63,26 @@ def build_text_pdf_bytes(page_texts: List[str]) -> bytes:
         stream_ref = writer._add_object(content_stream)
         page[NameObject("/Contents")] = stream_ref
 
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def build_empty_pdf_bytes(page_count: int = 1) -> bytes:
+    """Create a PDF with blank pages containing 0 text (simulating scanned / empty pages)."""
+    writer = PdfWriter()
+    for _ in range(page_count):
+        writer.add_blank_page(width=612, height=792)
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def build_encrypted_pdf_bytes(password: str = "secret") -> bytes:
+    """Create an encrypted password-protected PDF."""
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.encrypt(password)
     buf = io.BytesIO()
     writer.write(buf)
     return buf.getvalue()

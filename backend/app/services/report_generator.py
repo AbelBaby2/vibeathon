@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import csv
 import html
+import io
 import json
 import uuid
-from typing import List
+from typing import List, Optional
 
 from app.schemas.audit import AuditEvent
 from app.schemas.common import DECISION_SUPPORT_DISCLAIMER
+from app.schemas.compliance import ComplianceAnalysisResult, ComplianceStatus
+from app.schemas.permit import PermitReadinessResult
 from app.schemas.report import (
     ExportableReportData,
     ReportExportRequest,
@@ -18,6 +22,76 @@ from app.schemas.report import (
 
 class ReportGeneratorService:
     """Formats compliance analysis, work-permit checklist, and audit trail into exportable reports."""
+
+    def generate_compliance_csv(
+        self,
+        compliance: ComplianceAnalysisResult,
+        permit: Optional[PermitReadinessResult] = None,
+    ) -> str:
+        """Generate a CSV report containing the 9 required compliance fields."""
+        output = io.StringIO()
+        writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+
+        # Header row
+        writer.writerow([
+            "requirement_id",
+            "category",
+            "description",
+            "status",
+            "evidence_filename",
+            "page",
+            "excerpt",
+            "explanation",
+            "review_state",
+        ])
+
+        # Map permit checklist items by source requirement ID
+        permit_by_req = {}
+        if permit:
+            for item in permit.checklist_items:
+                if item.source_requirement_id:
+                    permit_by_req[item.source_requirement_id] = item
+
+        for assessment in compliance.assessments:
+            req = assessment.requirement
+            permit_item = permit_by_req.get(req.requirement_id)
+
+            if permit_item:
+                review_state = permit_item.review_status.value
+            elif assessment.status == ComplianceStatus.EVIDENCE_FOUND:
+                review_state = "ready_for_review"
+            elif assessment.status in (ComplianceStatus.CONFLICTING, ComplianceStatus.NEEDS_REVIEW):
+                review_state = "requires_verification"
+            else:
+                review_state = "incomplete"
+
+            if assessment.matched_evidence:
+                for ev in assessment.matched_evidence:
+                    writer.writerow([
+                        req.requirement_id,
+                        req.category.value,
+                        req.description,
+                        assessment.status.value,
+                        ev.filename,
+                        ev.page_number,
+                        ev.excerpt,
+                        assessment.rationale,
+                        review_state,
+                    ])
+            else:
+                writer.writerow([
+                    req.requirement_id,
+                    req.category.value,
+                    req.description,
+                    assessment.status.value,
+                    "",
+                    "",
+                    "",
+                    assessment.rationale,
+                    review_state,
+                ])
+
+        return output.getvalue()
 
     def generate_report(
         self,

@@ -28,6 +28,44 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_analysis_id
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_created_at
     ON audit_events (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS uploaded_documents (
+    document_id TEXT PRIMARY KEY,
+    filename TEXT NOT NULL,
+    role TEXT NOT NULL,
+    file_size_bytes INTEGER NOT NULL,
+    page_count INTEGER NOT NULL,
+    content_type TEXT NOT NULL,
+    sha256_hash TEXT,
+    pages_json TEXT NOT NULL,
+    total_chars INTEGER NOT NULL,
+    is_text_based INTEGER NOT NULL,
+    uploaded_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS compliance_analyses (
+    analysis_id TEXT PRIMARY KEY,
+    tender_document_id TEXT NOT NULL,
+    bidder_document_ids_json TEXT NOT NULL,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS permit_checklists (
+    permit_pack_id TEXT PRIMARY KEY,
+    analysis_id TEXT UNIQUE NOT NULL,
+    contract_reference TEXT,
+    planned_start_date TEXT,
+    site_location TEXT,
+    checklist_items_json TEXT NOT NULL,
+    summary_json TEXT NOT NULL,
+    unresolved_conditions_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_permit_checklists_analysis_id
+    ON permit_checklists (analysis_id);
 """
 
 

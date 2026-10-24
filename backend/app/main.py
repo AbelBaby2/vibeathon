@@ -11,8 +11,10 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
+    analysis_router,
     audit_router,
     compliance_router,
+    documents_router,
     health_router,
     permit_router,
     reports_router,
@@ -72,7 +74,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=allowed_origins if allowed_origins else ["*"],
         allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=["X-Request-ID"],
     )
@@ -91,6 +93,8 @@ def create_app() -> FastAPI:
 
     # Mount routers
     app.include_router(health_router)
+    app.include_router(documents_router)
+    app.include_router(analysis_router)
     app.include_router(compliance_router)
     app.include_router(permit_router)
     app.include_router(audit_router)

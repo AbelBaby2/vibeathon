@@ -136,6 +136,11 @@ class PDFExtractorService:
                 f"Unable to read PDF '{safe_filename}': {exc}"
             ) from exc
 
+        if reader.is_encrypted:
+            raise PDFExtractionError(
+                f"PDF '{safe_filename}' is encrypted or password-protected. Encrypted PDFs are not supported."
+            )
+
         page_count = len(reader.pages)
         if page_count == 0:
             raise PDFExtractionError(f"PDF '{safe_filename}' contains 0 pages.")
@@ -149,6 +154,7 @@ class PDFExtractorService:
         extracted_pages: list[ExtractedPage] = []
         warnings: list[str] = []
         total_chars = 0
+        max_total_chars = self.settings.max_extracted_text_chars
 
         for idx, page in enumerate(reader.pages, start=1):
             try:
@@ -159,10 +165,23 @@ class PDFExtractorService:
                     f"Page {idx} of '{safe_filename}' raised an extraction warning: {exc}"
                 )
 
-            normalized_text = raw_text.strip()
+            # Normalize unicode characters and remove null bytes
+            normalized_text = (
+                raw_text.replace("\x00", "").strip()
+            )
+            # Guard against unbounded single-page payloads
+            if len(normalized_text) > 100000:
+                normalized_text = normalized_text[:100000]
+                warnings.append(f"Page {idx} of '{safe_filename}' exceeded 100,000 characters and was truncated.")
+
             char_count = len(normalized_text)
             word_count = len(normalized_text.split()) if normalized_text else 0
             total_chars += char_count
+
+            if total_chars > max_total_chars:
+                raise UploadLimitExceededError(
+                    f"Total extracted text from '{safe_filename}' exceeds limit of {max_total_chars} characters."
+                )
 
             if char_count == 0:
                 warnings.append(
@@ -178,11 +197,17 @@ class PDFExtractorService:
                 )
             )
 
+        if total_chars == 0:
+            raise PDFExtractionError(
+                f"Document '{safe_filename}' contains no extractable text and appears to be a scanned PDF. "
+                "OCR is not supported yet in this MVP. Please provide a machine-readable text PDF."
+            )
+
         is_text_based = total_chars >= 20
         if not is_text_based:
             warnings.append(
-                f"Document '{safe_filename}' yielded minimal text ({total_chars} chars). "
-                "Bid2Work AI MVP requires text-based PDFs."
+                f"Document '{safe_filename}' yielded minimal text ({total_chars} chars) and may be scanned. "
+                "OCR is not supported yet in this MVP."
             )
 
         metadata = DocumentMetadata(

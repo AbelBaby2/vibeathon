@@ -38,6 +38,7 @@ class ErrorCode(str, Enum):
     PDF_EXTRACTION_ERROR = "PDF_EXTRACTION_ERROR"
     LLM_PROVIDER_ERROR = "LLM_PROVIDER_ERROR"
     NOT_FOUND = "NOT_FOUND"
+    FORBIDDEN = "FORBIDDEN"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -103,6 +104,9 @@ class HealthStatus(BaseModel):
     service: str = Field(..., description="Application name.")
     version: str = Field(..., description="Application version.")
     environment: str = Field(..., description="Runtime environment name.")
+    llm_enabled: bool = Field(
+        default=False, description="Whether live LLM API mode is enabled."
+    )
     llm_configured: bool = Field(
         ..., description="Whether an external LLM API key is configured."
     )

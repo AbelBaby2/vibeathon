@@ -21,6 +21,16 @@ class RequirementCategory(str, Enum):
     CERTIFICATION = "CERTIFICATION"
     DEADLINE = "DEADLINE"
     SAFETY = "SAFETY"
+    OTHER = "OTHER"
+
+    @classmethod
+    def _missing_(cls, value: object):
+        if isinstance(value, str):
+            val_upper = value.strip().upper()
+            for member in cls:
+                if member.value == val_upper or member.name == val_upper:
+                    return member
+        return super()._missing_(value)
 
 
 class RequirementPriority(str, Enum):
@@ -38,6 +48,23 @@ class ComplianceStatus(str, Enum):
     MISSING = "Missing"
     CONFLICTING = "Conflicting"
     NEEDS_REVIEW = "Needs Review"
+
+    @classmethod
+    def _missing_(cls, value: object):
+        if isinstance(value, str):
+            v_norm = value.strip().lower().replace("_", " ").replace("-", " ")
+            for member in cls:
+                if (
+                    member.value.lower() == v_norm
+                    or member.name.lower() == value.strip().lower()
+                    or member.name.lower() == v_norm.replace(" ", "_")
+                ):
+                    return member
+        return super()._missing_(value)
+
+    @property
+    def code(self) -> str:
+        return self.name.lower()
 
 
 class SourceReference(BaseModel):
@@ -79,6 +106,21 @@ class TenderRequirement(BaseModel):
     threshold_or_criteria: Optional[str] = Field(
         default=None,
         description="Specific numeric threshold, standard code, or deadline date if applicable.",
+    )
+    expected_evidence: Optional[str] = Field(
+        default=None, description="Expected type of supporting documentation."
+    )
+    unit_or_currency: Optional[str] = Field(
+        default=None, description="Extracted currency, unit, or measurement standard."
+    )
+    validity_period: Optional[str] = Field(
+        default=None, description="Extracted validity period, timeline, or deadline."
+    )
+    confidence: float = Field(
+        default=0.9, ge=0.0, le=1.0, description="Extraction confidence score."
+    )
+    needs_review: bool = Field(
+        default=False, description="Whether requirement criteria is flagged for human review."
     )
     requires_permit_carryover: bool = Field(
         default=False,
