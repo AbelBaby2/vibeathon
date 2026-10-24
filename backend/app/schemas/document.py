@@ -16,6 +16,15 @@ class DocumentRole(str, Enum):
     BIDDER_SUPPORTING = "BIDDER_SUPPORTING"
     SAFETY_PERMIT = "SAFETY_PERMIT"
 
+    @classmethod
+    def _missing_(cls, value: object):
+        if isinstance(value, str):
+            v_upper = value.strip().upper().replace(" ", "_").replace("-", "_")
+            for member in cls:
+                if member.value == v_upper or member.name == v_upper:
+                    return member
+        return super()._missing_(value)
+
 
 class ExtractedPage(BaseModel):
     """Page-level extracted text and metrics retained for source traceability."""
@@ -24,6 +33,9 @@ class ExtractedPage(BaseModel):
     text: str = Field(..., description="Extracted plain text content from the page.")
     char_count: int = Field(..., ge=0, description="Character count of extracted text.")
     word_count: int = Field(..., ge=0, description="Approximate word count on the page.")
+
+
+DocumentPage = ExtractedPage
 
 
 class DocumentMetadata(BaseModel):
@@ -67,3 +79,22 @@ class DocumentExtractionResult(BaseModel):
         default_factory=list,
         description="Warnings encountered during extraction (e.g., empty pages).",
     )
+
+
+class DocumentUploadBatchResponse(BaseModel):
+    """Result of uploading one or more documents with explicit roles."""
+
+    uploaded_documents: List[DocumentMetadata] = Field(
+        default_factory=list, description="Metadata for all successfully processed documents."
+    )
+    tender_document: Optional[DocumentMetadata] = Field(
+        default=None, description="Metadata for uploaded tender document, if present."
+    )
+    bidder_documents: List[DocumentMetadata] = Field(
+        default_factory=list, description="Metadata for uploaded bidder documents."
+    )
+    total_files: int = Field(..., ge=0, description="Total count of uploaded files.")
+    warnings: List[str] = Field(
+        default_factory=list, description="Extraction or processing warnings."
+    )
+

@@ -47,7 +47,7 @@ class UploadLimitExceededError(AppError):
         super().__init__(
             message=message,
             code=ErrorCode.UPLOAD_LIMIT_EXCEEDED,
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=413,
             details=details,
         )
 
@@ -75,7 +75,7 @@ class PDFExtractionError(AppError):
         super().__init__(
             message=message,
             code=ErrorCode.PDF_EXTRACTION_ERROR,
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=422,
             details=details,
         )
 
@@ -90,6 +90,48 @@ class ExternalLLMError(AppError):
             message=message,
             code=ErrorCode.LLM_PROVIDER_ERROR,
             status_code=status.HTTP_502_BAD_GATEWAY,
+            details=details,
+        )
+
+
+class ConfigurationError(AppError):
+    """Raised when live LLM mode is enabled but required API credentials or configuration is missing."""
+
+    def __init__(
+        self, message: str, details: Optional[List[ApiErrorDetail]] = None
+    ) -> None:
+        super().__init__(
+            message=message,
+            code=ErrorCode.LLM_PROVIDER_ERROR,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            details=details,
+        )
+
+
+class NotFoundError(AppError):
+    """Raised when a requested resource (document, analysis, checklist, or item) is not found."""
+
+    def __init__(
+        self, message: str, details: Optional[List[ApiErrorDetail]] = None
+    ) -> None:
+        super().__init__(
+            message=message,
+            code=ErrorCode.NOT_FOUND,
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=details,
+        )
+
+
+class UnauthorizedReviewerError(AppError):
+    """Raised when an unauthorized user attempts to approve permit items."""
+
+    def __init__(
+        self, message: str, details: Optional[List[ApiErrorDetail]] = None
+    ) -> None:
+        super().__init__(
+            message=message,
+            code=ErrorCode.FORBIDDEN,
+            status_code=status.HTTP_403_FORBIDDEN,
             details=details,
         )
 
@@ -151,7 +193,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         ]
         logger.info("Request validation failed", extra={"extra_fields": {"count": len(details)}})
         return _build_error_response(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=422,
             code=ErrorCode.VALIDATION_ERROR,
             message="Request payload or parameters failed validation.",
             details=details,

@@ -26,6 +26,24 @@ class PermitItemStatus(str, Enum):
     NEEDS_REVIEW = "Needs Review"
 
 
+class HumanReviewStatus(str, Enum):
+    """Human-review state for permit checklist verification."""
+
+    INCOMPLETE = "incomplete"
+    REQUIRES_VERIFICATION = "requires_verification"
+    READY_FOR_REVIEW = "ready_for_review"
+    APPROVED_BY_REVIEWER = "approved_by_reviewer"
+
+    @classmethod
+    def _missing_(cls, value: object):
+        if isinstance(value, str):
+            v_norm = value.strip().lower().replace(" ", "_").replace("-", "_")
+            for member in cls:
+                if member.value == v_norm or member.name.lower() == v_norm:
+                    return member
+        return super()._missing_(value)
+
+
 class PermitCategory(str, Enum):
     """Safety and operational permit checklist domains."""
 
@@ -91,6 +109,48 @@ class PermitChecklistItem(BaseModel):
     remediation_steps: List[str] = Field(
         default_factory=list,
         description="Actionable steps required to resolve pending or expired items.",
+    )
+    review_status: HumanReviewStatus = Field(
+        default=HumanReviewStatus.INCOMPLETE,
+        description="Human-review state: incomplete, requires_verification, ready_for_review, or approved_by_reviewer.",
+    )
+    reviewer_name: Optional[str] = Field(
+        default=None, description="Name or identifier of the human reviewer."
+    )
+    reviewer_role: Optional[str] = Field(
+        default=None, description="Role of the human reviewer (e.g., Authorized HSE Officer)."
+    )
+    reviewer_notes: Optional[str] = Field(
+        default=None, description="Audited comments or conditions left by the reviewer."
+    )
+    reviewed_at: Optional[datetime] = Field(
+        default=None, description="UTC timestamp of the latest review update."
+    )
+    attached_evidence_ids: List[str] = Field(
+        default_factory=list, description="IDs of user-attached evidence items."
+    )
+
+
+class PermitItemUpdateRequest(BaseModel):
+    """Payload for PATCH /api/v1/permit-items/{item_id}."""
+
+    review_status: Optional[HumanReviewStatus] = Field(
+        default=None, description="Target review status."
+    )
+    reviewer_name: Optional[str] = Field(
+        default=None, description="Name or ID of reviewer."
+    )
+    reviewer_role: Optional[str] = Field(
+        default=None, description="Reviewer role (e.g. authorised_reviewer, hse_officer)."
+    )
+    reviewer_notes: Optional[str] = Field(
+        default=None, description="Audited review explanation or rationale."
+    )
+    is_authorized_reviewer: Optional[bool] = Field(
+        default=None, description="Whether the user is an authorized human reviewer."
+    )
+    attached_evidence_ids: Optional[List[str]] = Field(
+        default=None, description="List of evidence IDs associated with this permit item."
     )
 
 

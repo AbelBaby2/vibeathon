@@ -5,7 +5,9 @@ from app.core.exceptions import (
     AppError,
     ExternalLLMError,
     InvalidFileTypeError,
+    NotFoundError,
     PDFExtractionError,
+    UnauthorizedReviewerError,
     UploadLimitExceededError,
     register_exception_handlers,
 )
@@ -19,6 +21,8 @@ __all__ = [
     "InvalidFileTypeError",
     "PDFExtractionError",
     "ExternalLLMError",
+    "NotFoundError",
+    "UnauthorizedReviewerError",
     "register_exception_handlers",
     "configure_logging",
     "get_logger",

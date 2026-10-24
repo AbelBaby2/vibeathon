@@ -33,6 +33,12 @@ _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 _load_dotenv_file(_BACKEND_ROOT / ".env")
 
 
+def _parse_bool(val: str | None, default: bool = False) -> bool:
+    if val is None:
+        return default
+    return str(val).strip().lower() in ("true", "1", "yes", "t", "on")
+
+
 class Settings(BaseModel):
     """Application settings loaded from environment variables."""
 
@@ -55,13 +61,18 @@ class Settings(BaseModel):
     cors_allowed_origins_raw: str = Field(
         default_factory=lambda: os.getenv(
             "CORS_ALLOWED_ORIGINS",
-            "http://localhost:5173,http://127.0.0.1:5173",
+            os.getenv(
+                "CORS_ORIGINS",
+                "http://localhost:5173,http://127.0.0.1:5173",
+            ),
         )
     )
 
     # Document & PDF upload safeguards
     max_upload_size_mb: int = Field(
-        default_factory=lambda: int(os.getenv("MAX_UPLOAD_SIZE_MB", "25")),
+        default_factory=lambda: int(
+            os.getenv("MAX_UPLOAD_SIZE_MB", os.getenv("MAX_UPLOAD_MB", "25"))
+        ),
         ge=1,
         le=200,
     )
@@ -75,21 +86,31 @@ class Settings(BaseModel):
         ge=1,
         le=2000,
     )
+    max_extracted_text_chars: int = Field(
+        default_factory=lambda: int(os.getenv("MAX_EXTRACTED_TEXT_CHARS", "2000000")),
+        ge=1000,
+    )
     temp_upload_dir: str = Field(
         default_factory=lambda: os.getenv("TEMP_UPLOAD_DIR", "/tmp/bid2work_uploads")
     )
 
-    # Lightweight SQLite persistence for MVP audit events
+    # Persistence / SQLite database path
     sqlite_db_path: str = Field(
         default_factory=lambda: os.getenv(
-            "SQLITE_DB_PATH",
-            str(_BACKEND_ROOT / "data" / "bid2work_audit.db"),
+            "DATABASE_URL",
+            os.getenv(
+                "SQLITE_DB_PATH",
+                str(_BACKEND_ROOT / "data" / "bid2work_audit.db"),
+            ),
         )
     )
 
     # External LLM API settings
+    llm_enabled: bool = Field(
+        default_factory=lambda: _parse_bool(os.getenv("LLM_ENABLED", "false"))
+    )
     llm_provider: str = Field(
-        default_factory=lambda: os.getenv("LLM_PROVIDER", "openai_compatible")
+        default_factory=lambda: os.getenv("LLM_PROVIDER", "openai")
     )
     llm_api_key: str = Field(
         default_factory=lambda: os.getenv("LLM_API_KEY", "")
@@ -106,6 +127,11 @@ class Settings(BaseModel):
         default_factory=lambda: int(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
         ge=5,
         le=300,
+    )
+    llm_max_retries: int = Field(
+        default_factory=lambda: int(os.getenv("LLM_MAX_RETRIES", "2")),
+        ge=0,
+        le=5,
     )
 
     @field_validator("log_level")
@@ -139,8 +165,19 @@ class Settings(BaseModel):
             "your_llm_api_key_placeholder_here",
             "changeme",
             "none",
+            "sk-placeholder",
         }
         return key.lower() not in placeholders
+
+    def validate_live_llm_config(self) -> None:
+        """Raise ConfigurationError if live mode is enabled but no valid key is present."""
+        if self.llm_enabled and not self.is_llm_configured:
+            from app.core.exceptions import ConfigurationError
+
+            raise ConfigurationError(
+                "Live LLM mode is enabled (LLM_ENABLED=true), but LLM_API_KEY is missing or contains "
+                "a placeholder value. Set a valid LLM_API_KEY or configure LLM_ENABLED=false for mock mode."
+            )
 
 
 @lru_cache(maxsize=1)
